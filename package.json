@@ -1,0 +1,16 @@
+{
+  "name": "devops-cicd-app",
+  "version": "1.0.0",
+  "description": "Basic Node.js app for CI/CD project.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "mkdir -p build && echo '<!DOCTYPE html><html><head><title>CI/CD Success</title></head><body><h1>Deployment SUCCESS! Container is serving Nginx content.</h1><p>This page was generated during the Docker build stage.</p></body></html>' > build/index.html"
+  },
+  "keywords": ["node", "docker", "devops"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
