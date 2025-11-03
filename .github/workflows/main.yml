@@ -3,17 +3,18 @@ name: Full CI/CD Pipeline
 on:
   push:
     branches:
-      - main
+      - main  # Trigger pipeline on push to the main branch
 
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
+      # 1️⃣ CHECKOUT REPO
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. BUILD & PUSH STAGE (Docker)
+      # 2️⃣ BUILD & PUSH DOCKER IMAGE
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -30,28 +31,40 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/devops-cicd-app:latest
 
-      # 2. DEPLOY STAGE (SSH)
-      - name: Deploy via SSH
+      # 3️⃣ DEPLOY TO EC2 VIA SSH
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_PUBLIC_IP }}
-          username: ubuntu
+          username: ec2-user
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          port: 22
           script: |
-            echo "Deployment started on EC2 instance..."
-            
-            # Pull the latest image
+            echo "🚀 Deployment started on EC2 instance..."
+
+            # Set image tag
             IMAGE_TAG="${{ secrets.DOCKER_USERNAME }}/devops-cicd-app:latest"
-            sudo docker pull $IMAGE_TAG
-            
-            # Stop and remove the old container
-            sudo docker stop web-app-container || true
-            sudo docker rm web-app-container || true
-            
-            # Run the new container
-            sudo docker run -d \
+
+            # Log in to Docker (required for private repos)
+            docker login -u "${{ secrets.DOCKER_USERNAME }}" -p "${{ secrets.DOCKER_PASSWORD }}"
+
+            # Pull latest image
+            docker pull $IMAGE_TAG
+
+            # Stop & remove old container
+            docker stop web-app-container || true
+            docker rm web-app-container || true
+
+            # Run updated container
+            docker run -d \
               --name web-app-container \
               -p 80:80 \
               $IMAGE_TAG
-            
-            echo "Deployment successful. Check public IP."
+
+            echo "✅ Deployment successful. Access app at http://${{ secrets.EC2_PUBLIC_IP }}"
+
+      # 4️⃣ FINAL VERIFICATION
+      - name: Final Verification
+        run: |
+          echo "🎉 Pipeline complete!"
+          echo "Check app: http://${{ secrets.EC2_PUBLIC_IP }}"
