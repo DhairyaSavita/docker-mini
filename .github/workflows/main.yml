@@ -3,23 +3,22 @@ name: Full CI/CD Pipeline
 on:
   push:
     branches:
-      - main  # Trigger pipeline on push to the main branch
+      - main # Trigger on push to the main branch
 
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1️⃣ CHECKOUT REPO
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ BUILD & PUSH DOCKER IMAGE
+      # 1. BUILD & PUSH STAGE (Docker)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          password: ${{ secrets.DOCKER_PASSWORD }} # Requires Read & Write scopes
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -29,42 +28,38 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/devops-cicd-app:latest
+          # Replace 'savitadhairya' with your actual Docker username if needed
+          tags: ${{ secrets.DOCKER_USERNAME }}/devops-cicd-app:latest 
 
-      # 3️⃣ DEPLOY TO EC2 VIA SSH
-      - name: Deploy to EC2
+      # 2. DEPLOY STAGE (SSH)
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_PUBLIC_IP }}
-          username: ec2-user
+          username: ec2-user  # <--- CORRECTED: Changed from 'ubuntu' to 'ec2-user'
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          port: 22
           script: |
-            echo "🚀 Deployment started on EC2 instance..."
-
-            # Set image tag
+            echo "Deployment started on EC2 instance..."
+            
+            # --- Deployment Logic ---
             IMAGE_TAG="${{ secrets.DOCKER_USERNAME }}/devops-cicd-app:latest"
-
-            # Log in to Docker (required for private repos)
-            docker login -u "${{ secrets.DOCKER_USERNAME }}" -p "${{ secrets.DOCKER_PASSWORD }}"
-
-            # Pull latest image
+            
+            # Pull the latest image
+            # Note: Docker commands run fine as ec2-user on Amazon Linux after user_data runs
             docker pull $IMAGE_TAG
-
-            # Stop & remove old container
+            
+            # Stop and remove the old container
             docker stop web-app-container || true
             docker rm web-app-container || true
-
-            # Run updated container
+            
+            # Run the new container
             docker run -d \
               --name web-app-container \
               -p 80:80 \
               $IMAGE_TAG
+            
+            echo "Deployment successful. Check public IP."
 
-            echo "✅ Deployment successful. Access app at http://${{ secrets.EC2_PUBLIC_IP }}"
-
-      # 4️⃣ FINAL VERIFICATION
       - name: Final Verification
         run: |
-          echo "🎉 Pipeline complete!"
-          echo "Check app: http://${{ secrets.EC2_PUBLIC_IP }}"
+          echo "Pipeline complete. Check http://${{ secrets.EC2_PUBLIC_IP }}"
